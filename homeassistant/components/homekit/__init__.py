@@ -7,6 +7,13 @@ import voluptuous as vol
 
 from homeassistant.components import cover
 from homeassistant.components.media_player import DEVICE_CLASS_TV
+from homeassistant.components.climate.const import (
+    SUPPORT_TARGET_TEMPERATURE_RANGE,
+    HVAC_MODE_COOL,
+    HVAC_MODE_HEAT,
+    ATTR_HVAC_MODES,
+)
+
 from homeassistant.const import (
     ATTR_DEVICE_CLASS,
     ATTR_ENTITY_ID,
@@ -194,7 +201,16 @@ def get_accessory(hass, driver, state, aid, config):
         a_type = "BinarySensor"
 
     elif state.domain == "climate":
-        a_type = "Thermostat"
+        features = state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
+        modes = state.attributes.get(ATTR_HVAC_MODES, None)
+        if features & SUPPORT_TARGET_TEMPERATURE_RANGE:
+            a_type = "HeaterCooler"
+        elif modes is None or (HVAC_MODE_COOL in modes and HVAC_MODE_HEAT in modes):
+            # HeaterCooler does not have a single target temperature.
+            # Fall back to Thermostat.
+            a_type = "Thermostat"
+        else:
+            a_type = "HeaterCooler"
 
     elif state.domain == "cover":
         device_class = state.attributes.get(ATTR_DEVICE_CLASS)
@@ -373,6 +389,7 @@ class HomeKit:
             type_sensors,
             type_switches,
             type_thermostats,
+            type_heatercoolers,
         )
 
         for state in self.hass.states.all():
